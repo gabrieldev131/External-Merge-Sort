@@ -3,16 +3,17 @@ package gerenciador.view;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
+import gerenciador.controller.ordenar.ExternalSort;
 import gerenciador.model.actions.edicaoDeArquivos.buffer.BufferDeClientes;
 import gerenciador.model.actions.edicaoDeArquivos.buffer.buffer_user_cases.LeituraStrategy;
-import gerenciador.model.actions.ordenar.ExternalSort;
 import gerenciador.model.cliente.Cliente;
 
-import java.awt.*;
 import java.awt.event.AdjustmentEvent;
 import java.awt.event.AdjustmentListener;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public class ClienteGUI2 extends JFrame {
     private JTable table;
@@ -39,247 +40,271 @@ public class ClienteGUI2 extends JFrame {
         if (retorno == JFileChooser.APPROVE_OPTION) {
             arquivoSelecionado = fileChooser.getSelectedFile().getAbsolutePath();
             bufferDeClientes.setEstrategia(new LeituraStrategy());
-            bufferDeClientes.inicializa(arquivoSelecionado); // Substitua por sua implementação
-             // Passa o nome do arquivo aqui
+            bufferDeClientes.inicializa(arquivoSelecionado); // Passa o nome do arquivo aqui
             registrosCarregados = 0; // Reseta o contador
             tableModel.setRowCount(0); // Limpa a tabela
             carregarMaisClientes(); // Carrega os primeiros clientes
             arquivoCarregado = true; // Marca que o arquivo foi carregado
         }
     }
-    private void criarInterface() throws IOException{
-        JPanel panel = new JPanel(new BorderLayout());
-        JButton btnCarregar = new JButton("Carregar Clientes");
-        JButton btnOrdenar = new JButton("Ordenar por Nome");
-        JButton btnPesquisar = new JButton("Pesquisar Cliente");
-        JButton btnAdicionar = new JButton("Adicionar Cliente");
-        JButton btnRemover = new JButton("Remover Cliente");
 
-        // Layout para os botões
-        JPanel botoesPanel = new JPanel(new FlowLayout());
-        botoesPanel.add(btnCarregar);
-        botoesPanel.add(btnOrdenar);
-        botoesPanel.add(btnPesquisar);
-        botoesPanel.add(btnAdicionar);
-        botoesPanel.add(btnRemover);
+    private void criarInterface() throws IOException {
+        // Criação do mapa de botões
+        Map<String, JButton> botoes = new LinkedHashMap<>();
+        insereBotoes(botoes);
 
-        tableModel = new DefaultTableModel(new String[]{"#", "Nome", "Sobrenome", "Endereço", "Telefone", "Credit Score"}, 0);
+        // Configuração da tabela e do painel de rolagem
+        String[] clienteTableModel = {"#", "Nome", "Sobrenome", "Endereço", "Telefone", "Credit Score"};
+        tableModel = new DefaultTableModel(clienteTableModel, 0);
         table = new JTable(tableModel);
         JScrollPane scrollPane = new JScrollPane(table);
 
-         // Adiciona um listener ao JScrollPane para carregar mais clientes ao rolar
-         scrollPane.getVerticalScrollBar().addAdjustmentListener(new AdjustmentListener() {
+        // Listener para carregamento incremental
+        ajustarScrollPane(scrollPane);
+
+        // Uso do InterfaceBuilder para construir o painel principal
+        JPanel panel = BottonBuilder.construirInterface(botoes, scrollPane);
+
+        // Adiciona o painel principal à janela
+        add(panel);
+    }
+
+    private void insereBotoes(Map<String, JButton> botoes){
+        botoes.put("Carregar Clientes", criarBotao("Carregar Clientes", () -> {
+            try {
+                carregarArquivo();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }));
+        botoes.put("Ordenar por Nome", criarBotao("Ordenar por Nome", this::ordenarClientes));
+        botoes.put("Pesquisar Cliente", criarBotao("Pesquisar Cliente", this::pesquisarCliente));
+        botoes.put("Adicionar Cliente", criarBotao("Adicionar Cliente", this::adicionarCliente));
+        botoes.put("Remover Cliente", criarBotao("Remover Cliente", this::removerCliente));
+    }
+
+    protected JButton criarBotao(String texto, Runnable acao) {
+        JButton botao = new JButton(texto);
+        botao.addActionListener(e -> acao.run());
+        return botao;
+    }
+
+    private void ajustarScrollPane(JScrollPane scrollPane){
+        scrollPane.getVerticalScrollBar().addAdjustmentListener(new AdjustmentListener() {
             @Override
             public void adjustmentValueChanged(AdjustmentEvent e) {
                 if (!scrollPane.getVerticalScrollBar().getValueIsAdjusting()) {
-                    // Verifica se estamos no final da tabela e se o arquivo foi carregado
-                    if (arquivoCarregado && 
-                        scrollPane.getVerticalScrollBar().getValue() + 
-                        scrollPane.getVerticalScrollBar().getVisibleAmount() >= 
+                    if (arquivoCarregado &&
+                        scrollPane.getVerticalScrollBar().getValue() +
+                        scrollPane.getVerticalScrollBar().getVisibleAmount() >=
                         scrollPane.getVerticalScrollBar().getMaximum()) {
                         carregarMaisClientes();
                     }
                 }
             }
         });
-
-        btnCarregar.addActionListener(e -> {
-            try {
-                carregarArquivo();
-            } catch (IOException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            }
-        });
-
-        btnOrdenar.addActionListener(e -> ordenarClientes());
-
-        btnPesquisar.addActionListener(e -> pesquisarCliente());
-
-        btnAdicionar.addActionListener(e -> adicionarCliente());
-
-        btnRemover.addActionListener(e -> removerCliente());
-
-        panel.add(botoesPanel, BorderLayout.NORTH);
-        panel.add(scrollPane, BorderLayout.CENTER);
-        add(panel);
     }
 
     private void carregarMaisClientes() {
-        // Carrega apenas 10.000 registros de cada vez
-        Cliente[] clientes = bufferDeClientes.proximosClientes(TAMANHO_BUFFER); // Chama o método com o tamanho do buffer
-        if (clientes != null && clientes.length > 0) {
-            for (Cliente cliente : clientes) {
-                if (cliente != null) { // Verifica se o cliente não é nulo
-                    tableModel.addRow(new Object[]{tableModel.getRowCount() + 1, cliente.getNome(), cliente.getSobrenome(), cliente.getEndereco(), cliente.getTelefone(), cliente.getCreditScore()});
-                }
+        new ClienteLoaderTemplate() {
+            @Override
+            protected void processarCliente(Cliente cliente, DefaultTableModel tableModel) {
+                tableModel.addRow(new Object[]{tableModel.getRowCount() + 1, cliente.getNome(), cliente.getSobrenome(), cliente.getEndereco(), cliente.getTelefone(), cliente.getCreditScore()});
             }
-            registrosCarregados += clientes.length; // Atualiza o contador
-        }
-    }
+        }.carregarClientes(bufferDeClientes, tableModel, TAMANHO_BUFFER);
+    }    
     
     private void ordenarClientes() {
-        if (!arquivoCarregado) {
-            JOptionPane.showMessageDialog(this, "Nenhum arquivo carregado para ordenar.");
-            return;
-        }
-
-        String arquivoOrdenado = "clientes_ordenados.txt"; // Nome do arquivo de saída ordenado
+        if (!validarArquivoCarregado()) return;
+    
         try {
-            // Chama o método para ordenar o arquivo
-            ExternalSort merger = new ExternalSort();
-            arquivoOrdenado = merger.ordenarArquivoClientes(arquivoSelecionado, arquivoOrdenado);
-
-            // Atualiza o buffer e recarrega os dados na tabela
-            bufferDeClientes.setEstrategia(new LeituraStrategy());
-            bufferDeClientes.inicializa(arquivoOrdenado);
-            tableModel.setRowCount(0); // Limpa a tabela
-            registrosCarregados = 0; // Reseta o contador
-            carregarMaisClientes(); // Recarrega os clientes
-            JOptionPane.showMessageDialog(this, "Clientes ordenados com sucesso!");
+            String arquivoOrdenado = ordenarArquivoClientes();
+            atualizarDadosTabela(arquivoOrdenado);
+            exibirMensagem("Clientes ordenados com sucesso!");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Erro ao ordenar os clientes: " + e.getMessage());
+            exibirMensagemErro("Erro ao ordenar os clientes: " + e.getMessage());
         }
     }
+    
+    private boolean validarArquivoCarregado() {
+        if (!arquivoCarregado) {
+            exibirMensagemErro("Nenhum arquivo carregado para ordenar.");
+            return false;
+        }
+        return true;
+    }
+    
+    private String ordenarArquivoClientes() throws Exception {
+        ExternalSort merger = new ExternalSort();
+        return merger.ordenarArquivoClientes(arquivoSelecionado, "clientes_ordenados.txt");
+    }
+    
+    private void atualizarDadosTabela(String arquivoOrdenado) throws IOException {
+        bufferDeClientes.setEstrategia(new LeituraStrategy());
+        bufferDeClientes.inicializa(arquivoOrdenado);
+    
+        tableModel.setRowCount(0); // Limpa a tabela
+        registrosCarregados = 0;  // Reseta o contador
+        carregarMaisClientes();   // Recarrega os clientes
+    }
+    
+    private void exibirMensagem(String mensagem) {
+        JOptionPane.showMessageDialog(this, mensagem);
+    }
+    
+    private void exibirMensagemErro(String mensagem) {
+        JOptionPane.showMessageDialog(this, mensagem, "Erro", JOptionPane.ERROR_MESSAGE);
+    }
+    
+
     private void pesquisarCliente() {
-        if (!arquivoCarregado) {
-            JOptionPane.showMessageDialog(this, "Nenhum arquivo carregado para realizar a pesquisa.");
-            return;
-        }
+        if (!validarArquivoCarregado()) return;
     
-        String nome = JOptionPane.showInputDialog(this, "Digite o nome do cliente:");
-        if (nome == null || nome.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "O nome não pode ser vazio.");
-            return;
-        }
+        String nome = obterEntrada("Digite o nome do cliente:");
+        if (nome == null) return;
     
-        String sobrenome = JOptionPane.showInputDialog(this, "Digite o sobrenome do cliente (opcional):");
-        if (sobrenome != null) sobrenome = sobrenome.trim();
+        String sobrenome = obterEntradaOpcional("Digite o sobrenome do cliente (opcional):");
     
         try {
-            // Percorre as linhas da tabela para encontrar o cliente correspondente
-            for (int i = 0; i < tableModel.getRowCount(); i++) {
-                String nomeTabela = (String) tableModel.getValueAt(i, 1); // Nome na coluna 1
-                String sobrenomeTabela = (String) tableModel.getValueAt(i, 2); // Sobrenome na coluna 2
-    
-                if (nomeTabela.equalsIgnoreCase(nome) && 
-                    (sobrenome == null || sobrenome.isEmpty() || sobrenomeTabela.equalsIgnoreCase(sobrenome))) {
-                    
-                    // Seleciona e destaca a linha correspondente
-                    table.setRowSelectionInterval(i, i);
-                    table.scrollRectToVisible(table.getCellRect(i, 0, true));
-                    return; // Sai do método após encontrar o cliente
-                }
+            int linha = buscarCliente(nome, sobrenome);
+            if (linha >= 0) {
+                destacarClienteNaTabela(linha);
+            } else {
+                exibirMensagem("Nenhum cliente encontrado com os critérios especificados.");
             }
+        } catch (Exception e) {
+            exibirMensagemErro("Erro ao pesquisar o cliente: " + e.getMessage());
+        }
+    }
     
-            // Caso o cliente não seja encontrado
-            JOptionPane.showMessageDialog(this, "Nenhum cliente encontrado com os critérios especificados.");
+    private String obterEntrada(String mensagem) {
+        String entrada = JOptionPane.showInputDialog(this, mensagem);
+        if (entrada == null || entrada.trim().isEmpty()) {
+            exibirMensagemErro("A entrada não pode ser vazia.");
+            return null;
+        }
+        return entrada.trim();
+    }
+    
+    private String obterEntradaOpcional(String mensagem) {
+        String entrada = JOptionPane.showInputDialog(this, mensagem);
+        return (entrada != null) ? entrada.trim() : null;
+    }
+    
+    private int buscarCliente(String nome, String sobrenome) {
+        for (int i = 0; i < tableModel.getRowCount(); i++) {
+            String nomeTabela = (String) tableModel.getValueAt(i, 1);
+            String sobrenomeTabela = (String) tableModel.getValueAt(i, 2);
+    
+            if (nomeTabela.equalsIgnoreCase(nome) && 
+                (sobrenome == null || sobrenome.isEmpty() || sobrenomeTabela.equalsIgnoreCase(sobrenome))) {
+                return i; // Retorna o índice da linha encontrada
+            }
+        }
+        return -1; // Retorna -1 se o cliente não for encontrado
+    }
+    
+    private void destacarClienteNaTabela(int linha) {
+        table.setRowSelectionInterval(linha, linha);
+        table.scrollRectToVisible(table.getCellRect(linha, 0, true));
+    }
+    
+    private void adicionarCliente() {
+        if (!validarArquivoCarregado()) return;
+    
+        try {
+            // Obter informações do cliente
+            String nome = obterEntradaObrigatoria("Digite o nome do cliente:");
+            String sobrenome = obterEntradaObrigatoria("Digite o sobrenome do cliente:");
+            String endereco = obterEntradaObrigatoria("Digite o endereço do cliente:");
+            String telefone = obterEntradaObrigatoria("Digite o telefone do cliente:");
+            int creditScore = obterCreditScore();
+    
+            // Criar cliente e persistir no arquivo
+            Cliente novoCliente = new Cliente(nome, sobrenome, endereco, telefone, creditScore);
+            adicionarClienteAoArquivo(novoCliente);
+    
+            // Atualizar a tabela
+            atualizarTabelaComCliente(novoCliente);
+            exibirMensagem("Cliente adicionado com sucesso!");
     
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Erro ao pesquisar o cliente: " + e.getMessage());
+            exibirMensagemErro("Erro ao adicionar o cliente: " + e.getMessage());
         }
     }
     
-    
-
-    private void adicionarCliente() {
-        if (!arquivoCarregado) {
-            JOptionPane.showMessageDialog(this, "Nenhum arquivo carregado para adicionar clientes.");
-            return;
+    private String obterEntradaObrigatoria(String mensagem) throws Exception {
+        String entrada = JOptionPane.showInputDialog(this, mensagem);
+        if (entrada == null || entrada.trim().isEmpty()) {
+            throw new Exception("A entrada para \"" + mensagem + "\" não pode ser vazia.");
         }
+        return entrada.trim();
+    }
     
-        // Obtém as informações do cliente por meio de caixas de diálogo
-        String nome = JOptionPane.showInputDialog(this, "Digite o nome do cliente:");
-        if (nome == null || nome.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "O nome não pode ser vazio.");
-            return;
-        }
-    
-        String sobrenome = JOptionPane.showInputDialog(this, "Digite o sobrenome do cliente:");
-        if (sobrenome == null || sobrenome.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "O sobrenome não pode ser vazio.");
-            return;
-        }
-    
-        String endereco = JOptionPane.showInputDialog(this, "Digite o endereço do cliente:");
-        if (endereco == null || endereco.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "O endereço não pode ser vazio.");
-            return;
-        }
-    
-        String telefone = JOptionPane.showInputDialog(this, "Digite o telefone do cliente:");
-        if (telefone == null || telefone.trim().isEmpty()) {
-            JOptionPane.showMessageDialog(this, "O telefone não pode ser vazio.");
-            return;
-        }
-
+    private int obterCreditScore() throws Exception {
         String creditScoreStr = JOptionPane.showInputDialog(this, "Digite o credit score (0 a 100):");
-        int creditScore;
         try {
-            creditScore = Integer.parseInt(creditScoreStr);
+            int creditScore = Integer.parseInt(creditScoreStr);
             if (creditScore < 0 || creditScore > 100) {
-                JOptionPane.showMessageDialog(this, "O credit score deve estar entre 0 e 100.");
-                return;
+                throw new Exception("O credit score deve estar entre 0 e 100.");
             }
+            return creditScore;
         } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "O credit score deve ser um número válido.");
-            return;
-        }
-    
-        // Cria um novo cliente
-        Cliente novoCliente = new Cliente(nome, sobrenome, endereco, telefone, creditScore);
-    
-        try {
-            // Abre o arquivo em modo escrita
-            bufferDeClientes.getArquivoCliente().abrirArquivo(arquivoSelecionado, "append", Cliente.class);
-    
-            // Adiciona o cliente ao arquivo
-            bufferDeClientes.getArquivoCliente().escreveNoArquivo(Collections.singletonList(novoCliente));
-    
-            // Fecha o arquivo
-            bufferDeClientes.getArquivoCliente().fechaArquivo();
-    
-            // Atualiza a tabela
-            tableModel.addRow(new Object[]{tableModel.getRowCount() + 1, nome, sobrenome, endereco, telefone, creditScore});
-            JOptionPane.showMessageDialog(this, "Cliente adicionado com sucesso!");
-
-
-        } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, "Erro ao adicionar o cliente: " + e.getMessage());
+            throw new Exception("O credit score deve ser um número válido.");
         }
     }
     
-
+    private void adicionarClienteAoArquivo(Cliente cliente) throws IOException {
+        bufferDeClientes.getArquivoCliente().abrirArquivo(arquivoSelecionado, "append", Cliente.class);
+        bufferDeClientes.getArquivoCliente().escreveNoArquivo(Collections.singletonList(cliente));
+        bufferDeClientes.getArquivoCliente().fechaArquivo();
+    }
     
-
-
+    private void atualizarTabelaComCliente(Cliente cliente) {
+        tableModel.addRow(new Object[]{
+            tableModel.getRowCount() + 1,
+            cliente.getNome(),
+            cliente.getSobrenome(),
+            cliente.getEndereco(),
+            cliente.getTelefone(),
+            cliente.getCreditScore()
+        });
+    }
+    
     private void removerCliente() {
         int selectedRow = table.getSelectedRow();
+        verifySelectedRow(selectedRow);
+        // Obtém o cliente selecionado na tabela
+        Cliente clienteExcluir = clienteSelecionadoNaTabela(selectedRow);
+        // Remove o cliente da tabela
+        tableModel.removeRow(selectedRow);
+        // Chama o método para excluir o cliente do arquivo
+        excluiDoArquivo(clienteExcluir);
+    }
+    
+    private void verifySelectedRow(int selectedRow){
         if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Nenhum cliente selecionado.");
+            exibirMensagem("Nenhum cliente selecionado.");
             return;
         }
-    
-        // Obtém o cliente selecionado na tabela
+    }
+
+    private Cliente clienteSelecionadoNaTabela(int selectedRow){
         String nome = tableModel.getValueAt(selectedRow, 1).toString();
         String sobrenome = tableModel.getValueAt(selectedRow, 2).toString();
         String endereco = tableModel.getValueAt(selectedRow, 3).toString();
         String telefone = tableModel.getValueAt(selectedRow, 4).toString();
         int creditScore = Integer.parseInt(tableModel.getValueAt(selectedRow, 5).toString());
     
-        Cliente clienteExcluir = new Cliente(nome, sobrenome, endereco, telefone, creditScore);
-    
-        // Remove o cliente da tabela
-        tableModel.removeRow(selectedRow);
-    
-        // Chama o método para excluir o cliente do arquivo
+        return new Cliente(nome, sobrenome, endereco, telefone, creditScore);
+    }
+
+    private void excluiDoArquivo(Cliente clienteExcluir){
         try {
             bufferDeClientes.getArquivoCliente().excluirCliente(arquivoSelecionado, TAMANHO_BUFFER, clienteExcluir);
-            JOptionPane.showMessageDialog(this, "Cliente removido com sucesso.");
+            exibirMensagem("Cliente removido com sucesso.");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Erro ao remover o cliente: " + e.getMessage());
-            e.printStackTrace();
+            exibirMensagemErro("Erro ao remover o cliente: " + e.getMessage());
         }
     }
-    
 }

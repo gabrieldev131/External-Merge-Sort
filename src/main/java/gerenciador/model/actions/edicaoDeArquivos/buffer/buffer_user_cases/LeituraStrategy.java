@@ -77,7 +77,7 @@ public class LeituraStrategy implements IBufferModeStrategy<Cliente> {
             clientes[i] = clienteOpt.get();
             i++;
         }
-        return clientes;
+        return clientes != null ? clientes : new Cliente[0];
     }
 
     @Override

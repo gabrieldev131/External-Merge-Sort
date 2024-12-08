@@ -7,8 +7,6 @@ import gerenciador.view.ClienteGUI2;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        //GeradorDeArquivosDeClientes gerador = new GeradorDeArquivosDeClientes();
-        //gerador.geraGrandeDataSetDeClientes("finalTest.txt", 10000000);
         SwingUtilities.invokeLater(() -> {
             ClienteGUI2 gui;
             try {

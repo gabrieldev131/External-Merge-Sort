@@ -69,11 +69,11 @@ public class Cliente implements Serializable {
     // Método para exibir as informações do cliente
     @Override
     public String toString() {
-        return this.getNome() + ","+ 
-                             this.getSobrenome() + ","+
-                             this.getEndereco() + ","+
-                         this.getTelefone() + ","+
-                              this.getCreditScore()+"\n";
+        return  this.getNome() + ","+ 
+                this.getSobrenome() + ","+
+                this.getEndereco() + ","+
+                this.getTelefone() + ","+
+                this.getCreditScore()+"\n";
     }
 
 }

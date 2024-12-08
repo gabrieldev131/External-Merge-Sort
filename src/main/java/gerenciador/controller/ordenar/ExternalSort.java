@@ -1,4 +1,4 @@
-package gerenciador.model.actions.ordenar;
+package gerenciador.controller.ordenar;
 
 import gerenciador.model.actions.edicaoDeArquivos.manipularArquivo.ArquivoCliente;
 import gerenciador.model.cliente.Cliente;
@@ -6,24 +6,25 @@ import gerenciador.model.cliente.Cliente;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
-//depois do chat 1
-public class TestSort {
+
+public class ExternalSort {
 
     private static final int TAMANHO_BUFFER = 100000; // Número de clientes que cabem na memória principal
 
     private final ArquivoCliente arquivoCliente = new ArquivoCliente();
     private final ArquivoCliente arquivoClienteTemp = new ArquivoCliente();
 
-    public void ordenarArquivoClientes(String arquivoEntrada, String arquivoSaida) {
+    public String ordenarArquivoClientes(String arquivoEntrada, String arquivoSaida) {
         try {
             // Passo 1: Dividir o arquivo em blocos menores e ordená-los
             List<String> arquivosTemporarios = dividirEOrdenar(arquivoEntrada);
             
             // Passo 2: Mesclar os arquivos temporários até que reste apenas um arquivo
-            mesclarArquivos(arquivosTemporarios, arquivoSaida);
-
+            String name = mesclarArquivos(arquivosTemporarios, arquivoSaida);
+            return name;
         } catch (IOException e) {
             e.printStackTrace();
+            return "Erro";  // Retorna uma string de erro em caso de exceção
         }
     }
 
@@ -59,7 +60,7 @@ public class TestSort {
         arquivoClienteTemp.fechaArquivo();
     }
 
-    public void mesclarArquivos(List<String> arquivosTemporarios, String arquivoSaida) throws IOException {
+    public String mesclarArquivos(List<String> arquivosTemporarios, String arquivoSaida) throws IOException {
         if (arquivosTemporarios == null || arquivosTemporarios.isEmpty()) {
             throw new IllegalArgumentException("Nenhum arquivo temporário foi fornecido.");
         }
@@ -104,6 +105,7 @@ public class TestSort {
             throw new IOException("Não foi possível renomear o arquivo final para: " + arquivoDestino.getAbsolutePath());
         }
 
+        return arquivoDestino.getName();
     }
     
 
