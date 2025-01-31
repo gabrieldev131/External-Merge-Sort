@@ -1,0 +1,6 @@
+public class NomeComparator implements ClienteComparatorStrategy {
+    @Override
+    public Comparator<Cliente> getComparator() {
+        return Comparator.comparing(Cliente::getNome).thenComparing(Cliente::getSobrenome);
+    }
+}
