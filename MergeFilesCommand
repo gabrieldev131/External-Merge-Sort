@@ -1,0 +1,68 @@
+import gerenciador.model.actions.edicaoDeArquivos.manipularArquivo.ArquivoCliente;
+import gerenciador.model.cliente.Cliente;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MergeFilesCommand implements MergeCommand {
+    @Override
+    public void execute(String arquivo1, String arquivo2, String arquivoSaida) throws IOException {
+        ArquivoCliente leitor1 = new ArquivoCliente();
+        ArquivoCliente leitor2 = new ArquivoCliente();
+        ArquivoCliente escritor = new ArquivoCliente();
+    
+        try {
+            List<Cliente> buffer1 = new ArrayList<>();
+            boolean arquivo1Concluido = true; 
+            if (arquivo1 != null) {
+                leitor1.abrirArquivo(arquivo1, "leitura", Cliente.class);
+                buffer1 = leitor1.leiaDoArquivo(ExternalSort.TAMANHO_BUFFER / 2);
+                arquivo1Concluido = buffer1.isEmpty();
+            }
+    
+            List<Cliente> buffer2 = new ArrayList<>();
+            boolean arquivo2Concluido = true; 
+            if (arquivo2 != null) {
+                leitor2.abrirArquivo(arquivo2, "leitura", Cliente.class);
+                buffer2 = leitor2.leiaDoArquivo(ExternalSort.TAMANHO_BUFFER / 2);
+                arquivo2Concluido = buffer2.isEmpty();
+            }
+    
+            escritor.abrirArquivo(arquivoSaida, "escrita", Cliente.class);
+    
+            List<Cliente> listaOrdenada = new ArrayList<>();
+    
+            while (!buffer1.isEmpty() || !buffer2.isEmpty()) {
+                if (!buffer1.isEmpty() || !buffer2.isEmpty()) {
+                    Cliente menorCliente = ExternalSort.retornaOMenor(buffer1, buffer2);
+                    listaOrdenada.add(menorCliente);
+                }
+            
+                if (listaOrdenada.size() == ExternalSort.TAMANHO_BUFFER / 2 || (buffer1.isEmpty() && buffer2.isEmpty())) {
+                    escritor.escreveNoArquivo(listaOrdenada);
+                    listaOrdenada.clear();
+                }
+            
+                if (buffer1.isEmpty() && !arquivo1Concluido) {
+                    buffer1 = leitor1.leiaDoArquivo(ExternalSort.TAMANHO_BUFFER / 2);
+                    arquivo1Concluido = buffer1.isEmpty();
+                }
+            
+                if (buffer2.isEmpty() && !arquivo2Concluido) {
+                    buffer2 = leitor2.leiaDoArquivo(ExternalSort.TAMANHO_BUFFER / 2);
+                    arquivo2Concluido = buffer2.isEmpty();
+                }
+            }
+            
+        } finally {
+            leitor1.fechaArquivo();
+            if (arquivo2 != null) leitor2.fechaArquivo();
+            escritor.fechaArquivo();
+    
+            if (arquivo1 != null) new File(arquivo1).delete();
+            if (arquivo2 != null) new File(arquivo2).delete();
+        }
+    }
+}
