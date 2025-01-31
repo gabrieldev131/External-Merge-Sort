@@ -1,0 +1,75 @@
+package gerenciador.controller.ordenar;
+
+import gerenciador.model.actions.edicaoDeArquivos.manipularArquivo.ArquivoCliente;
+import gerenciador.model.cliente.Cliente;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+
+public class ExternalSort extends AbstractFileSorter {
+
+    public static final int TAMANHO_BUFFER = 100000; 
+
+    private final ArquivoCliente arquivoCliente = ArquivoClienteFactory.criarArquivoCliente();
+    private final ArquivoCliente arquivoClienteTemp = ArquivoClienteFactory.criarArquivoCliente();
+
+    private ClienteComparatorStrategy estrategiaOrdenacao = new NomeComparator();
+
+    public void setEstrategiaOrdenacao(ClienteComparatorStrategy estrategia) {
+        this.estrategiaOrdenacao = estrategia;
+    }
+
+    @Override
+    protected List<String> dividirEOrdenar(String arquivoEntrada) throws IOException {
+        List<String> arquivosTemporarios = new ArrayList<>();
+        arquivoCliente.abrirArquivo(arquivoEntrada, "leitura", Cliente.class);
+
+        List<Cliente> buffer = new ArrayList<>();
+        int contadorArquivo = 0;
+        List<Cliente> clientesLidos;
+
+        while (true) {
+            clientesLidos = arquivoCliente.leiaDoArquivo(TAMANHO_BUFFER);
+            if (clientesLidos.isEmpty()) break;
+
+            buffer.addAll(clientesLidos);
+            buffer.sort(estrategiaOrdenacao.getComparator());
+
+            String nomeArquivoTemp = "temp_" + contadorArquivo++ + ".txt";
+            salvarBlocoOrdenado(buffer, nomeArquivoTemp);
+            arquivosTemporarios.add(nomeArquivoTemp);
+
+            buffer.clear();
+        }
+        arquivoCliente.fechaArquivo();
+        return arquivosTemporarios;
+    }
+
+    @Override
+    protected String mesclarArquivos(List<String> arquivosTemporarios, String arquivoSaida) throws IOException {
+        if (arquivosTemporarios == null || arquivosTemporarios.isEmpty()) {
+            throw new IllegalArgumentException("Nenhum arquivo temporário foi fornecido.");
+        }
+
+        MergeCommand mergeCommand = new MergeFilesCommand();
+
+        while (arquivosTemporarios.size() > 1) {
+            List<String> arquivosMesclados = new ArrayList<>();
+
+            for (int i = 0; i < arquivosTemporarios.size(); i += 2) {
+                String arquivo1 = arquivosTemporarios.get(i);
+                String arquivo2 = (i + 1 < arquivosTemporarios.size()) ? arquivosTemporarios.get(i + 1) : null;
+
+                String arquivoMesclado = "temp_merge_" + System.nanoTime() + ".txt";
+                mergeCommand.execute(arquivo1, arquivo2, arquivoMesclado);
+
+                arquivosMesclados.add(arquivoMesclado);
+            }
+
+            arquivosTemporarios = arquivosMesclados;
+        }
+
+        return arquivosTemporarios.get(0);
+    }
+}
