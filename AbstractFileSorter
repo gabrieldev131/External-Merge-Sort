@@ -2,13 +2,13 @@ import java.io.IOException;
 import java.util.List;
 
 public abstract class AbstractFileSorter {
-    protected abstract List<String> dividirEOrdenar(String arquivoEntrada) throws IOException;
-    protected abstract String mesclarArquivos(List<String> arquivosTemporarios, String arquivoSaida) throws IOException;
+    protected abstract List<String> processarArquivoEntrada(String arquivoEntrada) throws IOException;
+    protected abstract String combinarArquivosOrdenados(List<String> arquivosTemporarios, String arquivoSaida) throws IOException;
 
     public final String ordenar(String arquivoEntrada, String arquivoSaida) {
         try {
-            List<String> arquivosTemporarios = dividirEOrdenar(arquivoEntrada);
-            return mesclarArquivos(arquivosTemporarios, arquivoSaida);
+            List<String> arquivosTemporarios = processarArquivoEntrada(arquivoEntrada);
+            return combinarArquivosOrdenados(arquivosTemporarios, arquivoSaida);
         } catch (IOException e) {
             e.printStackTrace();
             return "Erro";
