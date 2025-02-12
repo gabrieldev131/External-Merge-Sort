@@ -1,0 +1,12 @@
+public class ArquivoClienteSingleton {
+    private static ArquivoCliente instancia;
+    
+    private ArquivoClienteSingleton() {}
+
+    public static ArquivoCliente getInstancia() {
+        if (instancia == null) {
+            instancia = new ArquivoCliente();
+        }
+        return instancia;
+    }
+}
