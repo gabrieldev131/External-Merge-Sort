@@ -14,7 +14,7 @@ public class ExternalSort extends AbstractFileSorter {
     private final ArquivoCliente arquivoCliente = ArquivoClienteFactory.criarArquivoCliente();
     private final ArquivoCliente arquivoClienteTemp = ArquivoClienteFactory.criarArquivoCliente();
 
-    private ClienteComparatorStrategy estrategiaOrdenacao = new NomeComparator();
+    private IClienteComparatorStrategy estrategiaOrdenacao = new NomeComparator();
 
     public void setEstrategiaOrdenacao(ClienteComparatorStrategy estrategia) {
         this.estrategiaOrdenacao = estrategia;
