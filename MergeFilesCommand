@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MergeFilesCommand implements MergeCommand {
+public class MergeFilesCommand implements IMergeCommand {
     @Override
     public void execute(String arquivo1, String arquivo2, String arquivoSaida) throws IOException {
         ArquivoCliente leitor1 = new ArquivoCliente();
