@@ -1,0 +1,92 @@
+package gerenciador.controller.ordenar;
+
+import gerenciador.model.actions.edicaoDeArquivos.manipularArquivo.ArquivoCliente;
+import gerenciador.model.cliente.Cliente;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+
+public class ExternalSort extends AbstractFileSorter {
+
+    public static final int TAMANHO_BUFFER = 100000;
+
+    private final ArquivoCliente arquivoCliente = ArquivoClienteFactory.criarArquivoCliente();
+    private final ArquivoCliente arquivoClienteTemp = ArquivoClienteFactory.criarArquivoCliente();
+
+    private IClienteComparatorStrategy estrategiaOrdenacao = new NomeComparator();
+
+    public void setEstrategiaOrdenacao(ClienteComparatorStrategy estrategia) {
+        this.estrategiaOrdenacao = estrategia;
+    }
+
+    @Override
+    protected List<String> processarArquivoEntrada(String caminhoArquivo) throws IOException {
+        List<String> arquivosTemporarios = new ArrayList<>();
+        arquivoCliente.abrirArquivo(caminhoArquivo, "leitura", Cliente.class);
+
+        int contadorArquivo = 0;
+
+        while (true) {
+            List<Cliente> clientesOrdenados = obterClientesOrdenados();
+            if (clientesOrdenados.isEmpty()) break;
+
+            String caminhoArquivoTemp = gerarNomeArquivoTemporario(contadorArquivo++);
+            salvarBlocoOrdenado(clientesOrdenados, caminhoArquivoTemp);
+            arquivosTemporarios.add(caminhoArquivoTemp);
+        }
+
+        arquivoCliente.fechaArquivo();
+        return arquivosTemporarios;
+    }
+
+    private List<Cliente> obterClientesOrdenados() throws IOException {
+        List<Cliente> clientes = arquivoCliente.leiaDoArquivo(TAMANHO_BUFFER);
+        if (clientes.isEmpty()) return Collections.emptyList();
+
+        clientes.sort(estrategiaOrdenacao.getComparator());
+        return clientes;
+    }
+
+    private String gerarNomeArquivoTemporario(int indice) {
+        return "temp_" + indice + ".txt";
+    }
+
+    @Override
+    protected String combinarArquivosOrdenados(List<String> arquivosTemporarios, String caminhoArquivoFinal) throws IOException {
+        validarListaDeArquivos(arquivosTemporarios);
+        MergeCommand mergeCommand = new MergeFilesCommand();
+
+        while (arquivosTemporarios.size() > 1) {
+            arquivosTemporarios = mesclarArquivosPares(arquivosTemporarios, mergeCommand);
+        }
+
+        return arquivosTemporarios.get(0);
+    }
+
+    private void validarListaDeArquivos(List<String> arquivosTemporarios) {
+        if (arquivosTemporarios == null || arquivosTemporarios.isEmpty()) {
+            throw new IllegalArgumentException("Nenhum arquivo temporário foi fornecido.");
+        }
+    }
+
+    private List<String> mesclarArquivosPares(List<String> arquivosTemporarios, MergeCommand mergeCommand) throws IOException {
+        List<String> arquivosMesclados = new ArrayList<>();
+
+        for (int i = 0; i < arquivosTemporarios.size(); i += 2) {
+            String arquivo1 = arquivosTemporarios.get(i);
+            String arquivo2 = (i + 1 < arquivosTemporarios.size()) ? arquivosTemporarios.get(i + 1) : null;
+
+            String caminhoArquivoMesclado = gerarNomeArquivoMesclado();
+            mergeCommand.execute(arquivo1, arquivo2, caminhoArquivoMesclado);
+
+            arquivosMesclados.add(caminhoArquivoMesclado);
+        }
+
+        return arquivosMesclados;
+    }
+
+    private String gerarNomeArquivoMesclado() {
+        return "temp_merge_" + System.nanoTime() + ".txt";
+    }
+}
