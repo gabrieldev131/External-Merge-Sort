@@ -1,0 +1,84 @@
+//implementa o método command
+import gerenciador.model.actions.edicaoDeArquivos.manipularArquivo.ArquivoCliente;
+import gerenciador.model.cliente.Cliente;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+public class MergeFilesCommand implements IMergeCommand {
+
+    @Override
+    public void execute(String arquivo1, String arquivo2, String arquivoSaida) throws IOException {
+        ArquivoCliente leitor1 = new ArquivoCliente();
+        ArquivoCliente leitor2 = new ArquivoCliente();
+        ArquivoCliente escritor = new ArquivoCliente();
+
+        try {
+            List<Cliente> buffer1 = carregarBuffer(leitor1, arquivo1);
+            List<Cliente> buffer2 = carregarBuffer(leitor2, arquivo2);
+            
+            boolean arquivo1Concluido = buffer1.isEmpty();
+            boolean arquivo2Concluido = buffer2.isEmpty();
+
+            escritor.abrirArquivo(arquivoSaida, "escrita", Cliente.class);
+
+            mesclarArquivos(leitor1, leitor2, escritor, buffer1, buffer2, arquivo1Concluido, arquivo2Concluido);
+
+        } finally {
+            fecharArquivos(leitor1, leitor2, escritor, arquivo1, arquivo2);
+        }
+    }
+
+    private List<Cliente> carregarBuffer(ArquivoCliente leitor, String arquivo) throws IOException {
+        if (arquivo == null) {
+            return new ArrayList<>();
+        }
+
+        leitor.abrirArquivo(arquivo, "leitura", Cliente.class);
+        return leitor.leiaDoArquivo(ExternalSort.TAMANHO_BUFFER / 2);
+    }
+
+    private void mesclarArquivos(
+        ArquivoCliente leitor1, ArquivoCliente leitor2, ArquivoCliente escritor,
+        List<Cliente> buffer1, List<Cliente> buffer2,
+        boolean arquivo1Concluido, boolean arquivo2Concluido
+    ) throws IOException {
+        
+        List<Cliente> listaOrdenada = new ArrayList<>();
+
+        while (!buffer1.isEmpty() || !buffer2.isEmpty()) {
+            
+            if (!buffer1.isEmpty() || !buffer2.isEmpty()) {
+                Cliente menorCliente = ExternalSort.retornaOMenor(buffer1, buffer2);
+                listaOrdenada.add(menorCliente);
+            }
+
+            if (listaOrdenada.size() == ExternalSort.TAMANHO_BUFFER / 2 || (buffer1.isEmpty() && buffer2.isEmpty())) {
+                escritor.escreveNoArquivo(listaOrdenada);
+                listaOrdenada.clear();
+            }
+
+            buffer1 = atualizarBuffer(leitor1, buffer1, arquivo1Concluido);
+            buffer2 = atualizarBuffer(leitor2, buffer2, arquivo2Concluido);
+        }
+    }
+
+    private List<Cliente> atualizarBuffer(ArquivoCliente leitor, List<Cliente> buffer, boolean arquivoConcluido) throws IOException {
+        if (buffer.isEmpty() && !arquivoConcluido) {
+            buffer = leitor.leiaDoArquivo(ExternalSort.TAMANHO_BUFFER / 2);
+            arquivoConcluido = buffer.isEmpty();
+        }
+        return buffer;
+    }
+
+    private void fecharArquivos(ArquivoCliente leitor1, ArquivoCliente leitor2, ArquivoCliente escritor, String arquivo1, String arquivo2) {
+        leitor1.fechaArquivo();
+        if (arquivo2 != null) leitor2.fechaArquivo();
+        escritor.fechaArquivo();
+
+        if (arquivo1 != null) new File(arquivo1).delete();
+        if (arquivo2 != null) new File(arquivo2).delete();
+    }
+}
