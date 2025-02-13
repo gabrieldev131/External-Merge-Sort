@@ -1,0 +1,7 @@
+//implementa o método strategy
+public class NomeComparator implements IComparatorStrategy {
+    @Override
+    public Comparator<Cliente> getComparator() {
+        return Comparator.comparing(Cliente::getNome).thenComparing(Cliente::getSobrenome);
+    }
+}
