@@ -1,3 +1,4 @@
+//implementa o método command
 import gerenciador.model.actions.edicaoDeArquivos.manipularArquivo.ArquivoCliente;
 import gerenciador.model.cliente.Cliente;
 
