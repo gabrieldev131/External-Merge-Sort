@@ -1,0 +1,6 @@
+//implementa o método command
+import java.io.IOException;
+
+public interface MergeCommand {
+    void execute(String arquivo1, String arquivo2, String arquivoSaida) throws IOException;
+}
