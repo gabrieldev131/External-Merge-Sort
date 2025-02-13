@@ -1,0 +1,6 @@
+//implementa o método fábrica
+public class ArquivoClienteFactory {
+    public static ArquivoCliente criarArquivoCliente() {
+        return new ArquivoCliente();
+    }
+}
