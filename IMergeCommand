@@ -1,3 +1,4 @@
+//implementa o método command
 import java.io.IOException;
 
 public interface MergeCommand {
