@@ -1,3 +1,4 @@
+//implementa o método strategy
 public interface ClienteComparatorStrategy {
     Comparator<Cliente> getComparator();
 }
