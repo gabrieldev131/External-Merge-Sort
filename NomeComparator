@@ -1,3 +1,4 @@
+//implementa o método strategy
 public class NomeComparator implements IClienteComparatorStrategy {
     @Override
     public Comparator<Cliente> getComparator() {
